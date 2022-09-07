@@ -1,6 +1,3 @@
-// This code is not complete and has been manipulated to align to Purdue University's Academic Integrity Policy. Any use or distribution of this code is considered
-   and should be reported as academic dishonesty.
-
 all: shell
 
 command.o: command.cc command.hh
