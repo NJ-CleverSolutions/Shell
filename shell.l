@@ -1,47 +1,3 @@
-%{
-#include "y.tab.hh"
-#include "shell.hh"
-#include "command.hh"
-#include <cstring>
-#include <unistd.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <string.h>
-#include <string>
-#include <vector>
-
-extern "C" char * read_line();
-
-int mygetc(FILE * f) {
-        static char *p;
-        char ch;
-        if(!isatty(0)) {
-                return getc(f);
-        }
-        if(p == NULL || *p == 0) {
-                char * s = read_line();
-                p=s;
-        }
-        ch = *p;
-        p++;
-        return ch;
-}
-#undef getc
-#define getc(f) mygetc(f)
-
-extern int errorCode;
-extern int lastID;
-extern std::vector<std::vector<std::string>> historyTable;
-static void yyunput (int c, char *buf_ptr);
-void myunputc(int c) {
-        unput(c);
-}
-%}
-%option noyywrap
-%%
-
 ">" {
         return GREATERTHAN;
 }
@@ -81,83 +37,57 @@ void myunputc(int c) {
 
 \~[^ \t\n\~/]* {
         std::string command = std::string(yytext);
-        command.erase(0,1);
         std::string path = "/homes/";
-        path.append(command);
         yylval.cpp_string = new std::string(path);
         return WORD;
 }
 
 \~[^ \t\n\~\/]*\/[^ \t\n\~\/]* {
         std::string command = std::string(yytext);
-        command.erase(0,1);
         std::string path = "/homes/";
-        path.append(command);
         yylval.cpp_string = new std::string(path);
         return WORD;
 }
 
 \$\{\$\} {
         int processID = getpid();
-        char id[100];
-        sprintf(id, "%d", processID);
-        yylval.cpp_string = new std::string(id);
+        yylval.cpp_string = new std::string(processID);
         return WORD;
 }
 
 \$\{\?\} {
         char code[10];
-        sprintf(code,"%d",errorCode);
         yylval.cpp_string = new std::string(code);
         return WORD;
 }
 
 \$\{\!\} {
         char id[100];
-        sprintf(id, "%d", lastID);
         yylval.cpp_string = new std::string(id);
         return WORD;
 }
 
 \$\{_\} {
-        std::vector<std::string> list = historyTable[historyTable.size()-1];
-        std::string command = list[list.size()-1];
+        std::vector<std::string> command = historyTable[historyTable.size()];
         yylval.cpp_string = new std::string(command);
         return WORD;
 }
 
 \$\{SHELL\} {
-        char absolute[100];
-        char * shellPath = realpath(Shell::currentCommand.path[0],absolute);
+        char * shellPath = Shell::currentCommand.path[0];
         yylval.cpp_string = new std::string(shellPath);
         return WORD;
 }
 
 ([^ \t\n\$]*\$\{[^ \t\n\}]*\}[^ \t\n\$]*)* {
         std::string command = std::string(yytext);
-        std::size_t firstDollar = command.find_first_of("$");
-        std::size_t firstFBracket = command.find_first_of("{");
-        std::size_t firstBBracket = command.find_first_of("}");
-        std::string c1 = command.substr(firstFBracket+1,firstBBracket - firstFBracket - 1);
-        char * environment = getenv(c1.c_str());
-        command.replace(firstDollar,c1.size()+3,std::string(environment),c1.size()-c1.size());
-        firstDollar = command.find_first_of("$");
-        firstFBracket = command.find_first_of("{");
-        firstBBracket = command.find_first_of("}");
-        if(firstDollar != std::string::npos){
-                std::string c2 = command.substr(firstFBracket+1,firstBBracket - firstFBracket - 1);
-                char * environment = getenv(c2.c_str());
-                command.replace(firstDollar,c2.size()+3,std::string(environment),c2.size()-c2.size());
-        }
+        char * environment = getenv(command.c_str());
+        command.replace(environment);
         yylval.cpp_string = new std::string(command);
         return WORD;
 }
 
 exit[ ]* {
-        if(isatty(0)){
-                printf("Good bye!!");
-                printf("\n");
-        }
         exit(1);
 }
 
